@@ -7,6 +7,9 @@ contract VestingShares is ERC20 {
     error VestingShares__NotVestingCore();
     error VestingShares__ZeroAddress();
 
+    event SharesMinted(address indexed to, uint amount);
+    event SharesBurned(address indexed from, uint amount);
+
     address public immutable vestingCore;
 
     modifier onlyVestingCore() {
@@ -29,9 +32,11 @@ contract VestingShares is ERC20 {
 
     function mint(address to, uint256 amount) external onlyVestingCore {
         _mint(to, amount);
+        emit SharesMinted(to, amount);
     }
 
     function burn(address from, uint256 amount) external onlyVestingCore {
         _burn(from, amount);
+        emit SharesBurned(from, amount);
     }
 }
