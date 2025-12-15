@@ -7,8 +7,8 @@ contract VestingShares is ERC20 {
     error VestingShares__NotVestingCore();
     error VestingShares__ZeroAddress();
 
-    event SharesMinted(address indexed to, uint amount);
-    event SharesBurned(address indexed from, uint amount);
+    event SharesMinted(address indexed to, uint256 amount);
+    event SharesBurned(address indexed from, uint256 amount);
 
     address public immutable vestingCore;
 
@@ -17,11 +17,7 @@ contract VestingShares is ERC20 {
         _;
     }
 
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        address _vestingCore
-    ) ERC20(_name, _symbol) {
+    constructor(string memory _name, string memory _symbol, address _vestingCore) ERC20(_name, _symbol) {
         if (_vestingCore == address(0)) revert VestingShares__ZeroAddress();
         vestingCore = _vestingCore;
     }

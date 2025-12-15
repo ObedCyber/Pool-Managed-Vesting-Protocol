@@ -29,9 +29,9 @@ contract VestingCore {
     //////////////////////////////////////////////////////////////*/
     struct VestingSchedule {
         address beneficiary;
-        uint256 totalAmount;      // total tokens locked
-        uint256 claimedAmount;    // already claimed
-        uint256 vestingRate;      // tokens per second (or per epoch)
+        uint256 totalAmount; // total tokens locked
+        uint256 claimedAmount; // already claimed
+        uint256 vestingRate; // tokens per second (or per epoch)
         uint256 lastClaimTime;
         bool paused;
     }
@@ -64,11 +64,7 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(
-        address underlyingToken_,
-        address vestingShares_,
-        address vestingPolicy_
-    ) {
+    constructor(address underlyingToken_, address vestingShares_, address vestingPolicy_) {
         underlyingToken = IERC20(underlyingToken_);
         vestingShares = IVestingShares(vestingShares_);
         vestingPolicy = vestingPolicy_;
@@ -77,15 +73,14 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                         VESTING CREATION (DEPOSIT)
     //////////////////////////////////////////////////////////////*/
-    function createVestingSchedule(
-        address beneficiary,
-        uint256 amount,
-        uint256 vestingRate
-    ) external returns (uint256 scheduleId) {
+    function createVestingSchedule(address beneficiary, uint256 amount, uint256 vestingRate)
+        external
+        returns (uint256 scheduleId)
+    {
         // pull tokens from user
         // It is assumed that the user has already approved the spending of its tokens
         bool success = underlyingToken.transferFrom(msg.sender, address(this), amount);
-        if(!success) revert VestingCore__TransferFailed();
+        if (!success) revert VestingCore__TransferFailed();
 
         // mint vesting shares 1:1 (assumption for now)
         vestingShares.mint(beneficiary, amount);
@@ -126,7 +121,7 @@ contract VestingCore {
 
         // transfer underlying tokens
         bool success = underlyingToken.transfer(msg.sender, claimable);
-        if(!success) revert VestingCore__TransferFailed();
+        if (!success) revert VestingCore__TransferFailed();
 
         emit Claimed(scheduleId, msg.sender, claimable);
     }
@@ -134,29 +129,17 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                         POLICY-CONTROLLED FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    function updateVestingRate(uint256 scheduleId, uint256 newRate)
-        external
-        onlyPolicy
-        validSchedule(scheduleId)
-    {
+    function updateVestingRate(uint256 scheduleId, uint256 newRate) external onlyPolicy validSchedule(scheduleId) {
         schedules[scheduleId].vestingRate = newRate;
         emit VestingRateUpdated(scheduleId, newRate);
     }
 
-    function pauseVesting(uint256 scheduleId)
-        external
-        onlyPolicy
-        validSchedule(scheduleId)
-    {
+    function pauseVesting(uint256 scheduleId) external onlyPolicy validSchedule(scheduleId) {
         schedules[scheduleId].paused = true;
         emit VestingPausedByPolicy(scheduleId);
     }
 
-    function resumeVesting(uint256 scheduleId)
-        external
-        onlyPolicy
-        validSchedule(scheduleId)
-    {
+    function resumeVesting(uint256 scheduleId) external onlyPolicy validSchedule(scheduleId) {
         schedules[scheduleId].paused = false;
         emit VestingResumedByPolicy(scheduleId);
     }
@@ -166,11 +149,7 @@ contract VestingCore {
     //////////////////////////////////////////////////////////////*/
 
     // This function returns the total tokens you are entitled to (both claimed and newly unlocked)
-    function _vestedAmount(VestingSchedule memory s)
-        internal
-        view
-        returns (uint256)
-    {
+    function _vestedAmount(VestingSchedule memory s) internal view returns (uint256) {
         uint256 elapsed = block.timestamp - s.lastClaimTime;
         uint256 vested = elapsed * s.vestingRate;
 
