@@ -10,6 +10,7 @@ contract VestingCore {
                                 ERRORS
     //////////////////////////////////////////////////////////////*/
     error VestingCore__NotAuthorized();
+    error VestingCore__ZeroAmount();
     error VestingCore__InvalidSchedule();
     error VestingCore__VestingPaused();
     error VestingCore__NothingToClaim();
@@ -47,6 +48,7 @@ contract VestingCore {
 
     uint256 public nextScheduleId;
     mapping(uint256 => VestingSchedule) public schedules;
+    mapping(address => uint256[]) public schedulesOf;
 
     /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
@@ -64,10 +66,10 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                                 CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(address underlyingToken_, address vestingShares_, address vestingPolicy_) {
-        underlyingToken = IERC20(underlyingToken_);
-        vestingShares = IVestingShares(vestingShares_);
-        vestingPolicy = vestingPolicy_;
+    constructor(address _underlyingToken, address _vestingShares, address _vestingPolicy) {
+        underlyingToken = IERC20(_underlyingToken);
+        vestingShares = IVestingShares(_vestingShares);
+        vestingPolicy = _vestingPolicy;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -77,6 +79,7 @@ contract VestingCore {
         external
         returns (uint256 scheduleId)
     {
+        if (amount == 0 || vestingRate == 0) revert VestingCore__ZeroAmount();
         // pull tokens from user
         // It is assumed that the user has already approved the spending of its tokens
         bool success = underlyingToken.transferFrom(msg.sender, address(this), amount);
@@ -95,6 +98,8 @@ contract VestingCore {
             lastClaimTime: block.timestamp,
             paused: false
         });
+
+        schedulesOf[beneficiary].push(scheduleId);
 
         emit VestingCreated(scheduleId, beneficiary, amount);
     }
