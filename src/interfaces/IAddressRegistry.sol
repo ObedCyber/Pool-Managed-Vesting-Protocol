@@ -13,4 +13,6 @@ interface IAddressRegistry {
     function getVestedTokenAddress() external view returns (address);
 
     function getBaseTokenAddress() external view returns (address);
+
+    function getOracleAddress() external view returns (address);
 }
