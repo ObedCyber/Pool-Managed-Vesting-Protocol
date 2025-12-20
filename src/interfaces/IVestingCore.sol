@@ -18,5 +18,4 @@ interface IVestingCore {
     function pauseVesting(uint256 scheduleId) external;
 
     function resumeVesting(uint256 scheduleId) external;
-
 }
