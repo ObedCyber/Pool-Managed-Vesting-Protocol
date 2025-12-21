@@ -10,12 +10,4 @@ interface IVestingCore {
 
     function claim (uint256 scheduleId) external;
 
-    function updateVestingRate(
-        uint256 scheduleId, 
-        uint256 newRate
-    ) external; 
-
-    function pauseVesting(uint256 scheduleId) external;
-
-    function resumeVesting(uint256 scheduleId) external;
 }
