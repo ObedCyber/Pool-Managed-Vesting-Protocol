@@ -19,6 +19,7 @@ contract Treasury {
     error Treasury__EmergencyModeActive();
     error Treasury__ReserveBreached();
     error Treasury__InvalidInputs();
+    error Treasury__TokenTransferFailed();
 
     event TokensPulled(
         address indexed to,
@@ -70,9 +71,15 @@ contract Treasury {
             revert Treasury__EmergencyModeActive();
         }
 
-        if (amountVested > 0) vestedtoken.transfer(msg.sender, amountVested);
-        if (amountBase > 0) baseToken.transfer(msg.sender, amountBase);
-
+        if (amountVested > 0){ 
+            bool ok = vestedtoken.transfer(msg.sender, amountVested);
+            if(!ok) revert Treasury__TokenTransferFailed();
+        }
+        if (amountBase > 0) {
+            bool ok = baseToken.transfer(msg.sender, amountBase);
+            if(!ok) revert Treasury__TokenTransferFailed();            
+        }
+            
 
         emit TokensPulled(msg.sender, amountVested, amountBase);
     }

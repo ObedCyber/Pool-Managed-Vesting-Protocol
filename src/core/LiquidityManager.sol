@@ -21,6 +21,8 @@ contract LiquidityManager {
 
     error LiquidityManager__NotAuthorized();
     error LiquidityManager__CannotReinitializePool();
+    error LiquidityManager__TokenTransferFailed();
+    error LiquidityManager__TokenApprovalFailed();
 
     event LiquidityProvided(uint256 tokenId, uint256 amount0, uint256 amount1);
     event LiquidityRemoved(uint256 amount0, uint256 amount1);
@@ -45,7 +47,7 @@ contract LiquidityManager {
         _;
     }
 
-     function initPool(uint160 sqrtPriceX96) external onlyController {
+    function initPool(uint160 sqrtPriceX96) external onlyController {
         if(pool != address(0)) {
             revert LiquidityManager__CannotReinitializePool();
         }
@@ -64,11 +66,20 @@ contract LiquidityManager {
     ) external onlyController {
         address treasury = IAddressRegistry(registry).getTreasuryAddress();
 
-        IERC20(token0).transferFrom(treasury, address(this), amount0Desired);
-        IERC20(token1).transferFrom(treasury, address(this), amount1Desired);
+        {bool ok = IERC20(token0).transferFrom(treasury, address(this), amount0Desired);
+        if (!ok) revert LiquidityManager__TokenTransferFailed();}
 
-        IERC20(token0).approve(address(positionManager), amount0Desired);
-        IERC20(token1).approve(address(positionManager), amount1Desired);
+       {bool ok = IERC20(token1).transferFrom(treasury, address(this), amount1Desired);
+        if (!ok) revert LiquidityManager__TokenTransferFailed();}
+
+        {
+            bool ok = IERC20(token0).approve(address(positionManager), amount0Desired);
+            if(!ok) revert LiquidityManager__TokenApprovalFailed();
+        }
+        {
+            bool ok = IERC20(token1).approve(address(positionManager), amount1Desired);
+            if(!ok) revert LiquidityManager__TokenApprovalFailed();
+        }
 
         INonfungiblePositionManager.MintParams
             memory params = INonfungiblePositionManager.MintParams({
@@ -119,14 +130,21 @@ contract LiquidityManager {
             })
         );
 
-        IERC20(token0).transfer(
+        {
+            bool ok = IERC20(token0).transfer(
             IAddressRegistry(registry).getTreasuryAddress(),
             amount0
-        );
-        IERC20(token1).transfer(
+            );
+            if (!ok) revert LiquidityManager__TokenTransferFailed();
+        }
+        {
+            bool ok = IERC20(token1).transfer(
             IAddressRegistry(registry).getTreasuryAddress(),
             amount1
-        );
+            );
+            if (!ok) revert LiquidityManager__TokenTransferFailed();
+        }
+ 
 
         emit LiquidityRemoved(amount0, amount1);
     }
@@ -146,14 +164,22 @@ contract LiquidityManager {
             })
         );
 
-        IERC20(token0).transfer(
+        {
+            bool ok = IERC20(token0).transfer(
             IAddressRegistry(registry).getTreasuryAddress(),
             amount0
-        );
-        IERC20(token1).transfer(
+            );
+            if (!ok) revert LiquidityManager__TokenTransferFailed();
+        }
+        
+        {
+            bool ok = IERC20(token1).transfer(
             IAddressRegistry(registry).getTreasuryAddress(),
             amount1
-        );
+            );
+            if (!ok) revert LiquidityManager__TokenTransferFailed();
+        }
+        
 
         emit FeesCollected(amount0, amount1);
     }
