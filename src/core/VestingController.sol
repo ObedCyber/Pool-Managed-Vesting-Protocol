@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import {IAddressRegistry} from "src/interfaces/IAddressRegistry.sol";
+
 /*//////////////////////////////////////////////////////////////
                             INTERFACES
 //////////////////////////////////////////////////////////////*/
@@ -23,21 +25,19 @@ contract VestingController is AutomationCompatibleInterface {
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
     //////////////////////////////////////////////////////////////*/
-
     error VestingController__OracleError();
     error VestingController__InvalidParams();
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
-
     event PolicyUpdated(uint256 periodDuration, uint256 tokensPerPeriod, bool paused);
 
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    IPriceOracle public immutable oracle;
+    IAddressRegistry public immutable addressRegistry;
 
     // Global vesting parameters
     uint256 public periodDuration;
@@ -59,7 +59,7 @@ contract VestingController is AutomationCompatibleInterface {
     //////////////////////////////////////////////////////////////*/
 
     constructor(
-        address _oracle,
+        address _addressRegistry,
         uint256 _initialPeriodDuration,
         uint256 _initialTokensPerPeriod,
         uint256 _highPriceThreshold,
@@ -70,13 +70,13 @@ contract VestingController is AutomationCompatibleInterface {
         uint256 _maxPeriodDuration
     ) {
         if (
-            _oracle == address(0) || _initialPeriodDuration == 0 || _initialTokensPerPeriod == 0
+            _addressRegistry == address(0) || _initialPeriodDuration == 0 || _initialTokensPerPeriod == 0
                 || _criticalLowPrice >= _lowPriceThreshold || _lowPriceThreshold >= _highPriceThreshold
                 || _recoveryPrice <= _lowPriceThreshold || _minPeriodDuration >= _maxPeriodDuration
                 || _initialPeriodDuration < _minPeriodDuration || _initialPeriodDuration > _maxPeriodDuration
         ) revert VestingController__InvalidParams();
 
-        oracle = IPriceOracle(_oracle);
+        addressRegistry = IAddressRegistry(_addressRegistry);
 
         periodDuration = _initialPeriodDuration;
         tokensPerPeriod = _initialTokensPerPeriod;
@@ -95,6 +95,7 @@ contract VestingController is AutomationCompatibleInterface {
     //////////////////////////////////////////////////////////////*/
 
     function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory) {
+        IPriceOracle oracle = IPriceOracle(addressRegistry.getPriceOracleAdapterAddress());
         uint256 price = oracle.getPrice();
         if (price == 0) revert VestingController__OracleError();
 
@@ -109,6 +110,7 @@ contract VestingController is AutomationCompatibleInterface {
     }
 
     function performUpkeep(bytes calldata) external override {
+        IPriceOracle oracle = IPriceOracle(addressRegistry.getPriceOracleAdapterAddress());
         uint256 price = oracle.getPrice();
         if (price == 0) revert VestingController__OracleError();
 

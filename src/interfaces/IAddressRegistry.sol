@@ -10,7 +10,7 @@ interface IAddressRegistry {
 
     function getLiquidityManagerAddress() external view returns (address);
 
-    function getPriceOracleAdapterAddres() external view returns (address);
+    function getPriceOracleAdapterAddress() external view returns (address);
 
     function getBaseTokenAddress() external view returns (address);
 

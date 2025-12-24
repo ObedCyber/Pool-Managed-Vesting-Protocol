@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {IVestingController} from "src/interfaces/IVestingController.sol";
 import {IVestingShares} from "src/interfaces/IVestingShares.sol";
 import {IERC20} from "src/interfaces/IERC20.sol";
+import {IAddressRegistry} from "src/interfaces/IAddressRegistry.sol";
 
 contract VestingCore {
     /*//////////////////////////////////////////////////////////////
@@ -26,9 +27,10 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                                 STATE
     //////////////////////////////////////////////////////////////*/
-    IERC20 public immutable vestingToken;
-    IVestingShares public immutable vestingShares;
-    IVestingController public controller;
+    // IERC20 public  vestingToken;
+    // IVestingShares public  vestingShares;
+    // IVestingController public  controller;
+    IAddressRegistry public immutable addressRegistry;
 
     uint256 public nextScheduleId;
 
@@ -52,14 +54,15 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(address _token, address _controller, address _vestingShares) {
-        if (_token == address(0) || _controller == address(0) || _vestingShares == address(0)) {
+    constructor(address registry) {
+        if (registry == address(0) ) {
             revert VestingCore__ZeroAddress();
         }
 
-        vestingToken = IERC20(_token);
-        controller = IVestingController(_controller);
-        vestingShares = IVestingShares(_vestingShares);
+        addressRegistry = IAddressRegistry(registry);
+        // vestingToken = IERC20(_token);
+        // controller = IVestingController(_controller);
+        // vestingShares = IVestingShares(_vestingShares);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -73,6 +76,9 @@ contract VestingCore {
         if (amount == 0) {
             revert VestingCore__ZeroAmount();
         }
+        IERC20 vestingToken = IERC20(addressRegistry.getVestedTokenAddress());
+        IVestingShares vestingShares = IVestingShares(addressRegistry.getVestingShareTokenAddress());
+
         // it is assumeed that ```approve()``` has already been called on the token
         bool ok = vestingToken.transferFrom(msg.sender, address(this), amount);
         if (!ok) {
@@ -91,12 +97,12 @@ contract VestingCore {
         //Mint vesting shares 1:1 with locked tokens
         vestingShares.mint(beneficiary, amount);
 
-        // schedulesOf[msg.sender].push(VestingSchedule({
-        //     beneficiary: beneficiary,
-        //     totalAmount: amount,
-        //     claimedAmount: 0,
-        //     lastReleaseTime: block.timestamp
-        // }));
+        schedulesOf[msg.sender].push(VestingSchedule({
+            beneficiary: beneficiary,
+            totalAmount: amount,
+            claimedAmount: 0,
+            lastReleaseTime: block.timestamp
+        }));
 
         emit VestingScheduleCreated(scheduleId, beneficiary, amount);
     }
@@ -111,6 +117,10 @@ contract VestingCore {
         if (msg.sender != s.beneficiary) {
             revert VestingCore__NotBeneficiary();
         }
+
+        IVestingController controller = IVestingController(addressRegistry.getVestingControllerAddress());
+        IVestingShares vestingShares = IVestingShares(addressRegistry.getVestingShareTokenAddress());
+        IERC20 vestingToken = IERC20(addressRegistry.getVestingShareTokenAddress());
 
         if (controller.isPaused()) {
             revert VestingCore__VestingPaused();
@@ -152,6 +162,7 @@ contract VestingCore {
         view
         returns (uint256 releasable, uint256 periodsElapsed, uint256 periodDuration)
     {
+        IVestingController controller = IVestingController(addressRegistry.getVestingControllerAddress());
         (uint256 periodDuration, uint256 tokensPerPeriod) = controller.getVestingParams();
 
         if (periodDuration < MIN_PERIOD || tokensPerPeriod == 0) {

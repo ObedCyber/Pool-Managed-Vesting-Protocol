@@ -6,6 +6,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract VestingShares is ERC20 {
     error VestingShares__NotVestingCore();
     error VestingShares__ZeroAddress();
+    error VestingShares__SharesNotTransferable();
 
     event SharesMinted(address indexed to, uint256 amount);
     event SharesBurned(address indexed from, uint256 amount);
@@ -34,5 +35,11 @@ contract VestingShares is ERC20 {
     function burn(address from, uint256 amount) external onlyVestingCore {
         _burn(from, amount);
         emit SharesBurned(from, amount);
+    }
+
+    // Changes the update function to make the shares non-transferable
+    function _update(address from, address to, uint256 value) internal override{
+        if(from != address(0) || to != address(0)) revert VestingShares__SharesNotTransferable();
+        super._update(from, to, value);
     }
 }
