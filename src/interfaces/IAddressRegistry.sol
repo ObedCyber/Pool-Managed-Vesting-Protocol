@@ -19,4 +19,5 @@ interface IAddressRegistry {
     function getVestingControllerAddress() external view returns (address);
 
     function getLiquidityController() external view returns (address);
+
 }
