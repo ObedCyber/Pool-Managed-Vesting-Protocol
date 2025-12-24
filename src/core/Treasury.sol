@@ -19,12 +19,9 @@ contract Treasury {
     error Treasury__EmergencyModeActive();
     error Treasury__ReserveBreached();
     error Treasury__InvalidInputs();
+    error Treasury__TokenTransferFailed();
 
-    event TokensPulled(
-        address indexed to,
-        uint256 amountVested,
-        uint256 amountBase
-    );
+    event TokensPulled(address indexed to, uint256 amountVested, uint256 amountBase);
 
     constructor(address _registry) {
         registry = IAddressRegistry(_registry);
@@ -33,10 +30,7 @@ contract Treasury {
     }
 
     modifier onlyAuthorized() {
-        if (
-            msg.sender != registry.getLiquidityManagerAddress() &&
-            msg.sender != registry.getVestingCoreAddress()
-        ) {
+        if (msg.sender != registry.getLiquidityManagerAddress() && msg.sender != registry.getVestingCoreAddress()) {
             revert Treasury__NotAuthorized();
         }
         _;
@@ -47,22 +41,13 @@ contract Treasury {
     }
 
     ///@notice Pull tokens from the treasury
-    function pullTokens(
-        uint256 amountVested,
-        uint256 amountBase
-    ) external onlyAuthorized {
-        (uint256 vestedBalance, uint256 baseBalance) = getBalanceAfterTransfer(
-            amountVested,
-            amountBase
-        );
-        (
-            uint256 minVestedReserve,
-            uint256 minBaseReserve
-        ) = getMinimumReserveReq();
+    function pullTokens(uint256 amountVested, uint256 amountBase) external onlyAuthorized {
+        (uint256 vestedBalance, uint256 baseBalance) = getBalanceAfterTransfer(amountVested, amountBase);
+        (uint256 minVestedReserve, uint256 minBaseReserve) = getMinimumReserveReq();
         if (vestedBalance < minVestedReserve || baseBalance < minBaseReserve) {
             revert Treasury__ReserveBreached();
         }
-        if(amountBase == 0 && amountVested == 0) {
+        if (amountBase == 0 && amountVested == 0) {
             revert Treasury__InvalidInputs();
         }
         // emergency mode blocks more token from being pulled by the liquidity manager
@@ -70,9 +55,14 @@ contract Treasury {
             revert Treasury__EmergencyModeActive();
         }
 
-        if (amountVested > 0) vestedtoken.transfer(msg.sender, amountVested);
-        if (amountBase > 0) baseToken.transfer(msg.sender, amountBase);
-
+        if (amountVested > 0) {
+            bool ok = vestedtoken.transfer(msg.sender, amountVested);
+            if (!ok) revert Treasury__TokenTransferFailed();
+        }
+        if (amountBase > 0) {
+            bool ok = baseToken.transfer(msg.sender, amountBase);
+            if (!ok) revert Treasury__TokenTransferFailed();
+        }
 
         emit TokensPulled(msg.sender, amountVested, amountBase);
     }
@@ -81,18 +71,17 @@ contract Treasury {
     function getMinimumReserveReq() internal view returns (uint256, uint256) {
         uint256 totalVestedTokens = vestedtoken.balanceOf(address(this));
         uint256 totalBaseTokens = baseToken.balanceOf(address(this));
-        uint256 minVestedReserve = (totalVestedTokens * minReserveBps) /
-            BPS_DENOMINATOR;
-        uint256 minBaseReserve = (totalBaseTokens * minReserveBps) /
-            BPS_DENOMINATOR;
+        uint256 minVestedReserve = (totalVestedTokens * minReserveBps) / BPS_DENOMINATOR;
+        uint256 minBaseReserve = (totalBaseTokens * minReserveBps) / BPS_DENOMINATOR;
         return (minVestedReserve, minBaseReserve);
     }
 
     ///@notice get balances after accounting for the transfer amounts
-    function getBalanceAfterTransfer(
-        uint256 amountVested,
-        uint256 amountBase
-    ) internal view returns (uint256, uint256) {
+    function getBalanceAfterTransfer(uint256 amountVested, uint256 amountBase)
+        internal
+        view
+        returns (uint256, uint256)
+    {
         uint256 baseBalance = baseToken.balanceOf(address(this)) - amountBase;
         uint256 vestedBalance = vestedtoken.balanceOf(address(this)) - amountVested;
 
