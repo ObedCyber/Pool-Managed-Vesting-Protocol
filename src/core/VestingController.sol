@@ -10,10 +10,7 @@ interface IPriceOracle {
 }
 
 interface AutomationCompatibleInterface {
-    function checkUpkeep(bytes calldata)
-        external
-        view
-        returns (bool upkeepNeeded, bytes memory performData);
+    function checkUpkeep(bytes calldata) external view returns (bool upkeepNeeded, bytes memory performData);
 
     function performUpkeep(bytes calldata performData) external;
 }
@@ -34,11 +31,7 @@ contract VestingController is AutomationCompatibleInterface {
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
 
-    event PolicyUpdated(
-        uint256 periodDuration,
-        uint256 tokensPerPeriod,
-        bool paused
-    );
+    event PolicyUpdated(uint256 periodDuration, uint256 tokensPerPeriod, bool paused);
 
     /*//////////////////////////////////////////////////////////////
                                 STORAGE
@@ -77,15 +70,10 @@ contract VestingController is AutomationCompatibleInterface {
         uint256 _maxPeriodDuration
     ) {
         if (
-            _oracle == address(0) ||
-            _initialPeriodDuration == 0 ||
-            _initialTokensPerPeriod == 0 ||
-            _criticalLowPrice >= _lowPriceThreshold ||
-            _lowPriceThreshold >= _highPriceThreshold ||
-            _recoveryPrice <= _lowPriceThreshold ||
-            _minPeriodDuration >= _maxPeriodDuration ||
-            _initialPeriodDuration < _minPeriodDuration ||
-            _initialPeriodDuration > _maxPeriodDuration
+            _oracle == address(0) || _initialPeriodDuration == 0 || _initialTokensPerPeriod == 0
+                || _criticalLowPrice >= _lowPriceThreshold || _lowPriceThreshold >= _highPriceThreshold
+                || _recoveryPrice <= _lowPriceThreshold || _minPeriodDuration >= _maxPeriodDuration
+                || _initialPeriodDuration < _minPeriodDuration || _initialPeriodDuration > _maxPeriodDuration
         ) revert VestingController__InvalidParams();
 
         oracle = IPriceOracle(_oracle);
@@ -106,20 +94,13 @@ contract VestingController is AutomationCompatibleInterface {
                         CHAINLINK AUTOMATION
     //////////////////////////////////////////////////////////////*/
 
-    function checkUpkeep(bytes calldata)
-        external
-        view
-        override
-        returns (bool upkeepNeeded, bytes memory)
-    {
+    function checkUpkeep(bytes calldata) external view override returns (bool upkeepNeeded, bytes memory) {
         uint256 price = oracle.getPrice();
         if (price == 0) revert VestingController__OracleError();
 
         if (
-            price <= criticalLowPrice ||
-            price >= recoveryPrice ||
-            price < lowPriceThreshold ||
-            price > highPriceThreshold
+            price <= criticalLowPrice || price >= recoveryPrice || price < lowPriceThreshold
+                || price > highPriceThreshold
         ) {
             return (true, bytes(""));
         }
@@ -180,11 +161,11 @@ contract VestingController is AutomationCompatibleInterface {
         }
     }
 
-    function getVestingParams() external view returns(uint256, uint256){
+    function getVestingParams() external view returns (uint256, uint256) {
         return (tokensPerPeriod, periodDuration);
     }
 
-    function isPaused() external view returns (bool){
+    function isPaused() external view returns (bool) {
         return paused;
     }
 }

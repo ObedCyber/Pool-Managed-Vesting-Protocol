@@ -2,10 +2,7 @@
 pragma solidity ^0.8.20;
 
 interface IVestingController {
-    function getVestingParams()
-        external
-        view
-        returns (uint256 periodDuration, uint256 tokensPerPeriod);
+    function getVestingParams() external view returns (uint256 periodDuration, uint256 tokensPerPeriod);
 
-    function isPaused(uint256 scheduleId) external view returns (bool);
+    function isPaused() external view returns (bool);
 }

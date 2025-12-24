@@ -45,30 +45,15 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
-    event VestingScheduleCreated(
-        uint256 indexed scheduleId,
-        address indexed beneficiary,
-        uint256 amount
-    );
+    event VestingScheduleCreated(uint256 indexed scheduleId, address indexed beneficiary, uint256 amount);
 
-    event TokensClaimed(
-        uint256 indexed scheduleId,
-        uint256 amount
-    );
+    event TokensClaimed(uint256 indexed scheduleId, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(
-        address _token,
-        address _controller,
-        address _vestingShares
-    ) {
-        if (
-            _token == address(0) ||
-            _controller == address(0) ||
-            _vestingShares == address(0)
-        ) {
+    constructor(address _token, address _controller, address _vestingShares) {
+        if (_token == address(0) || _controller == address(0) || _vestingShares == address(0)) {
             revert VestingCore__ZeroAddress();
         }
 
@@ -80,10 +65,7 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                           SCHEDULE CREATION
     //////////////////////////////////////////////////////////////*/
-    function createVestingSchedule(
-        address beneficiary,
-        uint256 amount
-    ) external returns (uint256 scheduleId) {
+    function createVestingSchedule(address beneficiary, uint256 amount) external returns (uint256 scheduleId) {
         if (beneficiary == address(0)) {
             revert VestingCore__ZeroAddress();
         }
@@ -92,11 +74,7 @@ contract VestingCore {
             revert VestingCore__ZeroAmount();
         }
         // it is assumeed that ```approve()``` has already been called on the token
-        bool ok = vestingToken.transferFrom(
-            msg.sender,
-            address(this),
-            amount
-        );
+        bool ok = vestingToken.transferFrom(msg.sender, address(this), amount);
         if (!ok) {
             revert VestingCore__TokenTransferFailed();
         }
@@ -127,20 +105,18 @@ contract VestingCore {
                                 CLAIM
     //////////////////////////////////////////////////////////////*/
     function claim(uint256 scheduleId) external {
-        if(scheduleId >= nextScheduleId) revert VestingCore__InvalidSchedule();
+        if (scheduleId >= nextScheduleId) revert VestingCore__InvalidSchedule();
         VestingSchedule storage s = schedules[scheduleId];
 
         if (msg.sender != s.beneficiary) {
             revert VestingCore__NotBeneficiary();
         }
 
-        if (controller.isPaused(scheduleId)) {
+        if (controller.isPaused()) {
             revert VestingCore__VestingPaused();
         }
 
-
-        (uint256 releasable, uint256 periodsElapsed, uint256 periodDuration) = calculateReleasable(scheduleId, s);
-
+        (uint256 releasable, uint256 periodsElapsed, uint256 periodDuration) = calculateReleasable(s);
 
         if (releasable > s.totalAmount - s.claimedAmount) {
             releasable = s.totalAmount - s.claimedAmount; //remaining tokens to be claimed
@@ -166,32 +142,29 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                           VIEW HELPERS
     //////////////////////////////////////////////////////////////*/
-    function remaining(uint256 scheduleId)
-        external
-        view
-        returns (uint256)
-    {
+    function remaining(uint256 scheduleId) external view returns (uint256) {
         VestingSchedule memory s = schedules[scheduleId];
         return s.totalAmount - s.claimedAmount;
     }
 
-    function calculateReleasable(
-        uint256 scheduleId,
-        VestingSchedule storage s
-    ) internal view returns (uint256 releasable, uint256 periodsElapsed, uint256 periodDuration) {
-        (uint256 periodDuration, uint256 tokensPerPeriod) =
-            controller.getVestingParams();
+    function calculateReleasable(VestingSchedule storage s)
+        internal
+        view
+        returns (uint256 releasable, uint256 periodsElapsed, uint256 periodDuration)
+    {
+        (uint256 periodDuration, uint256 tokensPerPeriod) = controller.getVestingParams();
 
-        if (periodDuration < MIN_PERIOD || tokensPerPeriod == 0)
+        if (periodDuration < MIN_PERIOD || tokensPerPeriod == 0) {
             revert VestingCore__InvalidParams();
+        }
 
         uint256 elapsed = block.timestamp - s.lastReleaseTime;
         periodsElapsed = elapsed / periodDuration;
 
-        if (periodsElapsed == 0)
+        if (periodsElapsed == 0) {
             revert VestingCore__NothingToClaim();
+        }
 
         releasable = periodsElapsed * tokensPerPeriod;
     }
-
 }
