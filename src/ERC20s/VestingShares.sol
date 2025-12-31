@@ -39,7 +39,7 @@ contract VestingShares is ERC20 {
 
     // Changes the update function to make the shares non-transferable
     function _update(address from, address to, uint256 value) internal override{
-        if(from != address(0) || to != address(0)) revert VestingShares__SharesNotTransferable();
+        if(from != address(0) && to != address(0)) revert VestingShares__SharesNotTransferable();
         super._update(from, to, value);
     }
 }

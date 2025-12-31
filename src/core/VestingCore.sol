@@ -32,8 +32,6 @@ contract VestingCore {
     // IVestingController public  controller;
     IAddressRegistry public immutable addressRegistry;
 
-    uint256 public nextScheduleId;
-
     struct VestingSchedule {
         address beneficiary;
         uint256 totalAmount;
@@ -41,15 +39,15 @@ contract VestingCore {
         uint256 lastReleaseTime;
     }
 
-    mapping(uint256 => VestingSchedule) public schedules;
-    mapping(address => VestingSchedule[]) public schedulesOf;
+    // maps a beneficiary to its vesting schedule
+    mapping(address => VestingSchedule) public schedules;
 
     /*//////////////////////////////////////////////////////////////
                                 EVENTS
     //////////////////////////////////////////////////////////////*/
-    event VestingScheduleCreated(uint256 indexed scheduleId, address indexed beneficiary, uint256 amount);
+    event VestingScheduleCreated(address indexed beneficiary, uint256 amount);
 
-    event TokensClaimed(uint256 indexed scheduleId, uint256 amount);
+    event TokensClaimed(address indexed beneficiary, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -68,59 +66,54 @@ contract VestingCore {
     /*//////////////////////////////////////////////////////////////
                           SCHEDULE CREATION
     //////////////////////////////////////////////////////////////*/
-    function createVestingSchedule(address beneficiary, uint256 amount) external returns (uint256 scheduleId) {
+    function createVestingSchedule(address beneficiary, uint256 amount) external{
         if (beneficiary == address(0)) {
             revert VestingCore__ZeroAddress();
         }
-
+      
         if (amount == 0) {
             revert VestingCore__ZeroAmount();
         }
         IERC20 vestingToken = IERC20(addressRegistry.getVestedTokenAddress());
-        IVestingShares vestingShares = IVestingShares(addressRegistry.getVestingShareTokenAddress());
+        IVestingShares vestingShares = IVestingShares(addressRegistry.getVestingShareTokenAddress());   
+
+        VestingSchedule storage s = schedules[beneficiary];
+
+        if (s.totalAmount !=0){
+            s.totalAmount += amount;
+        }else{
+            schedules[beneficiary] = VestingSchedule({
+                beneficiary: beneficiary,
+                totalAmount: amount,
+                claimedAmount: 0,
+                lastReleaseTime: block.timestamp
+            });
+        }
 
         // it is assumeed that ```approve()``` has already been called on the token
         bool ok = vestingToken.transferFrom(msg.sender, address(this), amount);
         if (!ok) {
             revert VestingCore__TokenTransferFailed();
         }
-
-        scheduleId = nextScheduleId++;
-
-        schedules[scheduleId] = VestingSchedule({
-            beneficiary: beneficiary,
-            totalAmount: amount,
-            claimedAmount: 0,
-            lastReleaseTime: block.timestamp
-        });
-
         //Mint vesting shares 1:1 with locked tokens
         vestingShares.mint(beneficiary, amount);
 
-        schedulesOf[msg.sender].push(VestingSchedule({
-            beneficiary: beneficiary,
-            totalAmount: amount,
-            claimedAmount: 0,
-            lastReleaseTime: block.timestamp
-        }));
-
-        emit VestingScheduleCreated(scheduleId, beneficiary, amount);
+        emit VestingScheduleCreated(beneficiary, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
                                 CLAIM
     //////////////////////////////////////////////////////////////*/
-    function claim(uint256 scheduleId) external {
-        if (scheduleId >= nextScheduleId) revert VestingCore__InvalidSchedule();
-        VestingSchedule storage s = schedules[scheduleId];
-
-        if (msg.sender != s.beneficiary) {
+    function claim(uint256 amount) external {
+        VestingSchedule storage s = schedules[msg.sender];
+        if (s.beneficiary == address(0)) {
             revert VestingCore__NotBeneficiary();
         }
+        if (amount == 0) revert VestingCore__ZeroAmount();
 
         IVestingController controller = IVestingController(addressRegistry.getVestingControllerAddress());
         IVestingShares vestingShares = IVestingShares(addressRegistry.getVestingShareTokenAddress());
-        IERC20 vestingToken = IERC20(addressRegistry.getVestingShareTokenAddress());
+        IERC20 vestingToken = IERC20(addressRegistry.getVestedTokenAddress());
 
         if (controller.isPaused()) {
             revert VestingCore__VestingPaused();
@@ -136,24 +129,28 @@ contract VestingCore {
             revert VestingCore__NothingToClaim();
         }
 
-        s.claimedAmount += releasable;
+        if (amount >= releasable){
+            amount = releasable;
+        }
+
+        s.claimedAmount += amount;
         s.lastReleaseTime += periodsElapsed * periodDuration;
 
         //Burn shares equal to claimed tokens
-        vestingShares.burn(s.beneficiary, releasable);
+        vestingShares.burn(s.beneficiary, amount);
 
-        if (!vestingToken.transfer(s.beneficiary, releasable)) {
+        if (!vestingToken.transfer(s.beneficiary, amount)) {
             revert VestingCore__TokenTransferFailed();
         }
 
-        emit TokensClaimed(scheduleId, releasable);
+        emit TokensClaimed(msg.sender, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
                           VIEW HELPERS
     //////////////////////////////////////////////////////////////*/
-    function remaining(uint256 scheduleId) external view returns (uint256) {
-        VestingSchedule memory s = schedules[scheduleId];
+    function remaining(address beneficiary) external view returns (uint256) {
+        VestingSchedule memory s = schedules[beneficiary];
         return s.totalAmount - s.claimedAmount;
     }
 
